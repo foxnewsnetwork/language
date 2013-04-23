@@ -5,7 +5,17 @@ module American where
 import Control.Monad.State
 import Language.English
 
+adjectives :: [Adjective]
+adjectives = map Adj [a1, a2, a3]
+  where a1 = "beautiful"
+        a2 = "faggy"
+        a3 = "dirty"
 
+adverbs :: [Adverb]
+adverbs = map Adv [a1, a2, a3]
+  where a1 = "quickly"
+        a2 = "sloppily"
+        a3 = "pointlessly"
 
 nouns :: [Noun]
 nouns = [n1, n2, n3, n4, n5, n6]
@@ -30,7 +40,10 @@ nounStates = filter isNounGood [ NState x y | x <- [Singular, Plural], y <- [The
 
 isNounGood :: NounState -> Bool
 isNounGood ns = foldr ( (&&) . ($ ns) ) True checks
-  where checks = [pluralSpecificity]
+  where checks = [pluralSpecificity, unknownSpecificity]
+        unknownSpecificity s = case specificity s of
+          Unknown -> False
+          _       -> True
         pluralSpecificity s = case (specificity s, plurality s) of
           (A, Plural) -> False
           _           -> True
@@ -45,7 +58,7 @@ sentencify :: English NounState Noun -> English VerbState Verb -> English NounSt
 sentencify s a o = unwords [show s, show a, show o]
 
 actions :: [English VerbState Verb]
-actions = [ put s >> return verb | s <- verbStates, verb <- verbs ]
+actions = [ put s >> return (describeVerb adverb verb) | s <- verbStates, verb <- verbs, adverb <- adverbs ]
 
 subjects :: [English NounState Noun]
-subjects = [ put s >> return noun | s <- nounStates, noun <- nouns ]
+subjects = [ put s >> return (describeNoun adjective noun) | s <- nounStates, noun <- nouns, adjective <- adjectives ]

@@ -5,16 +5,31 @@ module Language.English
 , Word(..)
 , Noun(..)
 , Verb(..)
+, Adjective(..)
+, Adverb(..)
 , NounState(..)
 , VerbState(..)
+, Plurality(..)
+, Temporality(..)
+, Specificity(..)
+, English
+, Descriptive(..)
 ) where
 
 import Control.Monad.State
 
+type English state a = State state a
+type EnglishNoun = English NounState Noun
+type EnglishVerb = English VerbState Verb
 class WordState a where
-  plurality   :: a -> Plurality
-  specificity :: a -> Specificity
-  temporality :: a -> Temporality
+  plurality     :: a -> Maybe Plurality
+  specificity   :: a -> Maybe Specificity
+  temporality   :: a -> Maybe Temporality
+  transitivity  :: a -> Maybe Transitivity
+
+class Descriptive a where
+  describeNoun :: a -> EnglishNoun -> EnglishNoun
+  describeVerb :: a -> EnglishVerb -> EnglishVerb
 
 class Word a where
   singular    :: a -> String
@@ -24,6 +39,21 @@ class Word a where
 
 data Noun = N { nSingular :: String, nPlural :: String }
 data Verb = V { vSingular :: String, vPlural :: String, vPast :: String, vPastPerfect :: String }
+data Adjective = Adj String
+data Adverb = Adv String
+
+instance Descriptive Adjective where
+  describeVerb _ = id
+  describeNoun (Adj str) = liftM $ nmap ( (str ++) . (" " ++) )
+    where nmap f (N a b) = N (f a) (f b)
+
+instance Descriptive Adverb where
+  describeNoun _ = id
+  describeVerb (Adv adverb) verbM = get >>= modifyBasedOnTransitivity . transitivity
+    where modifyBasedOnTransitivity Nothing = verbM
+          modifyBasedOnTransitivity (Just Transitive) = liftM ( vmap ( (adverb ++) . (" " ++) ) ) verbM
+          modifyBasedOnTransitivity (Just Intransitive) = liftM ( vmap ( (++ adverb) . (++ " ") ) ) verbM
+          vmap f (V a b c d) = V (f a) (f b) (f c) (f d)
 
 instance Word Noun where
   singular    = nSingular
@@ -37,23 +67,24 @@ instance Word Verb where
   past        = vPast
   pastPerfect = vPastPerfect
 
+instance WordState NounState where
+  plurality ns    = Just $ nPlurality ns
+  specificity ns  = Just $ nSpecificity ns
+  temporality _   = Nothing -- in English, nouns do not have temporality
+  transitivity _  = Nothing -- in English, nouns don't have transitivity either  
+
+instance WordState VerbState where
+  plurality vs    = Just $ vPlurality vs
+  specificity _   = Nothing -- in English, verbs do not have specificity
+  temporality vs  = Just $ vTemporality vs
+  transitivity _  = Nothing
+
 data NounState = NState { nPlurality :: Plurality, nSpecificity :: Specificity }
-data VerbState = VState { vPlurality :: Plurality, vTemporality :: Temporality }
+data VerbState = VState { vPlurality :: Plurality, vTemporality :: Temporality, vTransitivity :: Transitivity }
 data Plurality = Singular | Plural deriving(Show, Eq)
 data Temporality = PastPerfect | Past | Present deriving(Show, Eq)
 data Specificity = The | A | Unknown | Some deriving(Show, Eq)
-
-instance WordState NounState where
-  plurality     = nPlurality
-  specificity   = nSpecificity
-  temporality _ = Present -- in English, nouns do not have temporality
-
-instance WordState VerbState where
-  plurality     = vPlurality
-  specificity _ = Unknown -- in English, verbs do not have specificity
-  temporality   = vTemporality
-
-type English state a = State state a
+data Transitivity = Transitive | Intransitive deriving(Show, Eq)
 
 specify  :: WordState a => a -> String -> String
 specify ws = case specificity ws of

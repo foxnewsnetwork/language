@@ -11,6 +11,12 @@ import qualified Idea as I
 class Language l where
   grammar :: I.Idea (NounPhrase l) (VerbPhrase l) -> String
 
+class Noun a where
+  andNoun :: a -> a -> a
+  orNoun :: a -> a -> a
+  norNoun :: a -> a -> a
+  
+
 data NounPhrase word = NounPhrase word 
   | DescribeNoun (AdjectivePhrase word) (NounPhrase word)
   | AndNoun (NounPhrase word) (NounPhrase word)
